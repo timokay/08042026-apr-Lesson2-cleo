@@ -1,0 +1,59 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+.next/
+.turbo/
+dist/
+build/
+out/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+*.coverage
+
+# Docker
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# SSL certificates (generated locally)
+services/nginx/ssl/*.crt
+services/nginx/ssl/*.key
+services/nginx/ssl/*.pem
+
+# Database data (Docker volumes tracked separately)
+postgres_data/
+redis_data/
+
+# Test coverage reports
+coverage/
+coverage.xml
+
+# pnpm
+.pnpm-store/
+
+# TypeScript build info
+*.tsbuildinfo
+tsconfig.tsbuildinfo
