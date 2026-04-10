@@ -1,0 +1,11 @@
+{
+  "name": "@klevo/db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Supabase schema, RLS policies, migrations and seed data for Клёво",
+  "scripts": {
+    "db:reset": "docker exec klevo-postgres psql -U postgres -d klevo -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' && npm run db:migrate",
+    "db:migrate": "docker exec klevo-postgres psql -U postgres -d klevo -f /docker-entrypoint-initdb.d/001_init.sql && docker exec klevo-postgres psql -U postgres -d klevo -f /docker-entrypoint-initdb.d/002_rls_policies.sql && docker exec klevo-postgres psql -U postgres -d klevo -f /docker-entrypoint-initdb.d/003_indexes.sql",
+    "db:seed": "docker exec klevo-postgres psql -U postgres -d klevo -f /docker-entrypoint-initdb.d/seed.sql"
+  }
+}
