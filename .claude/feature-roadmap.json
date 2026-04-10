@@ -6,7 +6,7 @@
       "id": "csv-upload",
       "name": "CSV Upload & Parsing",
       "description": "Upload T-Bank/Sber/Alfa CSV, detect encoding, parse transactions, show top-5 categories",
-      "status": "next",
+      "status": "done",
       "files": [
         "apps/ai-service/services/csv_parser.py",
         "apps/ai-service/services/categorizer.py",
@@ -23,7 +23,7 @@
       "id": "parasite-scanner",
       "name": "Parasite Scanner",
       "description": "Detect recurring subscriptions from transaction history, show total monthly cost, allow mark-as-keep",
-      "status": "next",
+      "status": "done",
       "files": [
         "apps/ai-service/services/parasite_detector.py",
         "apps/web/app/api/dashboard/route.ts",
@@ -36,7 +36,7 @@
       "id": "roast-mode",
       "name": "AI Roast Mode",
       "description": "Generate humorous AI spending analysis with SSE streaming, Claude primary + YandexGPT fallback",
-      "status": "next",
+      "status": "done",
       "files": [
         "apps/ai-service/services/roast_generator.py",
         "apps/ai-service/routers/roast_router.py",
@@ -52,7 +52,7 @@
       "id": "share-roast-card",
       "name": "Share Roast Card",
       "description": "Generate shareable roast card (PNG + public URL), viral mechanism for organic growth",
-      "status": "planned",
+      "status": "done",
       "files": [
         "apps/web/app/share/[token]/page.tsx",
         "apps/web/app/api/share/route.ts",
@@ -65,12 +65,13 @@
       "id": "auth",
       "name": "Authentication",
       "description": "Supabase Auth with httpOnly JWT cookies, email signup/login, session management",
-      "status": "next",
+      "status": "done",
       "files": [
         "apps/web/lib/supabase/client.ts",
         "apps/web/lib/supabase/server.ts",
         "apps/web/lib/supabase/middleware.ts",
         "apps/web/middleware.ts",
+        "apps/web/app/auth/callback/route.ts",
         "packages/db/schema/001_init.sql",
         "packages/db/schema/002_rls_policies.sql"
       ],
@@ -81,7 +82,7 @@
       "id": "upgrade-plus",
       "name": "Upgrade to Plus",
       "description": "Robokassa payment integration, Plus plan (299₽/мес), plan enforcement (free: 1 roast/month)",
-      "status": "planned",
+      "status": "next",
       "files": [
         "apps/web/app/api/payment/route.ts",
         "apps/web/app/upgrade/page.tsx",
