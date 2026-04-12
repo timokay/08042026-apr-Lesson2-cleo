@@ -53,6 +53,16 @@ async def roast(req: RoastRequest) -> StreamingResponse:
             headers={"Retry-After": str(result.retry_after)},
         )
 
+    # Free plan: 1 roast per calendar month
+    if req.plan == "free":
+        monthly_result = await limiter.check_monthly_roast(req.user_id)
+        if not monthly_result.allowed:
+            raise HTTPException(
+                status_code=429,
+                detail={"code": "MONTHLY_LIMIT", "retry_after": monthly_result.retry_after},
+                headers={"Retry-After": str(monthly_result.retry_after)},
+            )
+
     if len(req.categories) < 1 or sum(c.count for c in req.categories) < 5:
         raise HTTPException(
             status_code=422,

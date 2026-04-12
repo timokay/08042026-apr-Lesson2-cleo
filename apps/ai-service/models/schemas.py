@@ -87,6 +87,7 @@ class RoastRequest(BaseModel):
     categories: list[CategorySummary]
     parasites: list[Subscription]
     total_spent: float
+    plan: Literal["free", "plus"] = "free"  # passed by BFF; determines monthly limit enforcement
 
 
 class ParasitesRequest(BaseModel):

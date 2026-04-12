@@ -19,6 +19,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: { code: 'VALIDATION_ERROR' } }, { status: 400 })
   }
 
+  // Fetch user's active plan (for monthly limit enforcement)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('plan, plan_expires_at')
+    .eq('id', user.id)
+    .single()
+
+  const now = new Date()
+  const planExpiry = profile?.plan_expires_at ? new Date(profile.plan_expires_at) : null
+  const activePlan = profile?.plan !== 'free' && planExpiry && planExpiry > now ? profile.plan : 'free'
+
   // Fetch user's transactions for the requested period
   const { period } = parsed.data
   const now = new Date()
@@ -63,6 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       categories: analyzed.categories,
       parasites: analyzed.parasites,
       total_spent: analyzed.total_spent,
+      plan: activePlan,
     }),
   }).catch(() => null)
 
@@ -71,7 +83,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   if (roastRes.status === 429) {
-    const err = await roastRes.json() as { detail: unknown }
+    const err = await roastRes.json() as { detail: { code: string; retry_after?: number } }
     return NextResponse.json({ error: err.detail }, { status: 429 })
   }
 
