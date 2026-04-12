@@ -60,11 +60,11 @@ export async function POST(request: NextRequest): Promise<Response> {
     )
   }
 
-  // Get financial context from AI service
-  const analyzeRes = await fetch(`${AI_SERVICE_URL}/analyze`, {
+  // Get financial context — cached in Redis by user_id+date (TTL 3600s)
+  const analyzeRes = await fetch(`${AI_SERVICE_URL}/analyze/context`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transactions, user_id: user.id }),
+    body: JSON.stringify({ user_id: user.id, transactions }),
   }).catch(() => null)
 
   if (!analyzeRes?.ok) {

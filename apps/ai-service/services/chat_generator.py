@@ -162,8 +162,9 @@ async def generate_chat_response(req: ChatRequest) -> AsyncGenerator[str, None]:
     """
     system = _build_system_prompt(req)
 
+    # Convert ChatMessage Pydantic models to plain dicts for JSON serialization
     messages = [
-        *req.history,
+        *[{"role": m.role, "content": m.content} for m in req.history],
         {"role": "user", "content": req.message},
     ]
 

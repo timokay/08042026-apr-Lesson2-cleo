@@ -101,15 +101,19 @@ return new_count
         return RateLimitResult(allowed=True, retry_after=0, remaining=limit - int(result))
 
     async def decrement_daily_chat(self, user_id: str) -> None:
-        """Undo a daily chat increment (e.g. when request fails before AI call)."""
+        """Undo a daily chat increment (e.g. when AI call fails before first token)."""
         from datetime import datetime, timezone
 
         now = datetime.now(timezone.utc)
         today = now.strftime('%Y-%m-%d')
         key = f"chat:daily:{user_id}:{today}"
-        count = await self._redis.get(key)
-        if count and int(count) > 0:
-            await self._redis.decr(key)
+        # Atomic Lua: only decrement if count > 0 (prevent negative values)
+        lua_script = """
+local count = tonumber(redis.call('GET', KEYS[1])) or 0
+if count > 0 then redis.call('DECR', KEYS[1]) end
+return 1
+"""
+        await self._redis.eval(lua_script, 1, key)
 
     def _monthly_roast_key(self, user_id: str) -> tuple[str, int]:
         """Returns (redis_key, ttl_seconds) for this user's current month."""

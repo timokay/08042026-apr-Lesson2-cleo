@@ -81,6 +81,19 @@ class AnalyzeResponse(BaseModel):
     total_spent: float
 
 
+class AnalyzeContextRequest(BaseModel):
+    """JSON-based analyze for BFF chat (transactions already in DB)."""
+    user_id: str
+    transactions: list[Transaction]
+
+
+class AnalyzeContextResponse(BaseModel):
+    """Lightweight context for AI chat system prompt."""
+    categories: list[dict]   # [{name, percent, total}]
+    parasites: list[dict]    # [{name, amount_per_month}]
+    total_spent: float
+
+
 class RoastRequest(BaseModel):
     user_id: str
     period: Literal["last_month", "last_3_months", "all"] = "last_month"

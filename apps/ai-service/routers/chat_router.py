@@ -75,6 +75,8 @@ async def _sse_stream(req: ChatRequest) -> AsyncGenerator[bytes, None]:
         logger.error("Chat generation failed: %s", e)
         # Remove the user message we already appended — generation never happened
         await limiter._redis.rpop(history_key)
+        # Undo the daily counter increment so failed AI calls don't drain quota
+        await limiter.decrement_daily_chat(req.user_id)
         error_payload = json.dumps({"code": "AI_UNAVAILABLE"}, ensure_ascii=False)
         yield f"event: error\ndata: {error_payload}\n\n".encode("utf-8")
 
