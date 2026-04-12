@@ -20,7 +20,7 @@ sequenceDiagram
   BFF->>BFF: Validate daily limit
   BFF->>Supabase: GET transactions (last 30 days)
   BFF->>AI: POST /analyze → { categories, parasites }
-  BFF->>Redis: GET chat:history:{session_id}
+  BFF->>Redis: GET chat:history:{user_id}:{session_id}
   BFF->>AI: POST /chat { message, history, context, plan }
   AI->>AI: check_ai_rate()
   AI->>AI: build system prompt + messages
