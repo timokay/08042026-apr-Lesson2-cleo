@@ -86,11 +86,24 @@ packages/db/schema/
 - InvoiceId UNIQUE в payment_transactions
 - Повторный webhook с тем же InvoiceId → уже `status=paid` → return OK без изменений
 
+### Webhook RLS (важно)
+Webhook endpoint `/api/payments/webhook` — PUBLIC (нет JWT). Использует **service role key** для DB updates (обходит RLS намеренно). Безопасность обеспечивается через MD5 signature verification, а не через RLS.
+
+`payment_transactions` RLS для чтения:
+```sql
+-- Пользователь читает только свои транзакции
+CREATE POLICY "select_payment_transactions_own"
+ON payment_transactions FOR SELECT
+USING (user_id = auth.uid());
+-- Webhook пишет через service_role_key → RLS bypass intentional
+```
+
 ### Secrets
 ```
 ROBOKASSA_MERCHANT_LOGIN  — не секрет (можно в env)
 ROBOKASSA_PASSWORD1       — секрет! (для создания подписи в create-invoice)
 ROBOKASSA_PASSWORD2       — секрет! (для проверки webhook)
+SUPABASE_SERVICE_ROLE_KEY — в webhook handler только (server-side)
 ```
 
 ### Plan Expiry Check

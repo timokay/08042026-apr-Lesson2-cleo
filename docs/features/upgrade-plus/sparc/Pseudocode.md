@@ -85,13 +85,20 @@ ASYNC FUNCTION handle_webhook(form_data: dict) → "OK{invoice_id}"
   IF NOT txn OR txn.user_id != user_id:
     RAISE 400 BAD_REQUEST
 
-  # Update transaction
-  await supabase.from('payment_transactions')
-    .update({ status: 'paid', paid_at: now(), robokassa_id: out_sum })
+  # Update transaction status to 'paid'
+  # Race condition protection: UNIQUE constraint on invoice_id prevents double-processing.
+  # If two concurrent webhooks arrive, the second .update() where status='pending'
+  # will affect 0 rows (already 'paid') → idempotent result.
+  { count } = await supabase.from('payment_transactions')
+    .update({ status: 'paid', paid_at: now_utc(), raw_robokassa_response: out_sum })
     .eq('invoice_id', invoice_id)
+    .eq('status', 'pending')  # Only update if still pending (race condition guard)
 
-  # Upgrade plan
-  expires_at = now() + timedelta(days=int(env.PLUS_DURATION_DAYS))  # 30 days
+  IF count == 0:
+    RETURN "OK{invoice_id}"  # Already processed by concurrent request
+
+  # Upgrade plan (atomically with transaction update above)
+  expires_at = datetime.now(UTC) + timedelta(days=int(env.PLUS_DURATION_DAYS))
   await supabase.from('profiles')
     .update({ plan: 'plus', plan_expires_at: expires_at.isoformat() })
     .eq('id', user_id)
@@ -117,8 +124,9 @@ ASYNC FUNCTION check_roast_allowed(user_id: str, redis: Redis) → (bool, str):
   IF profile AND profile['plan'] in ('plus', 'pro'):
     expires_at = profile.get('plan_expires_at')
     IF expires_at:
-      exp = datetime.fromisoformat(expires_at)
-      IF exp.replace(tzinfo=UTC) > datetime.now(UTC):
+      # Always compare UTC-aware datetimes to avoid DST/timezone issues
+      exp = datetime.fromisoformat(expires_at).replace(tzinfo=timezone.utc)
+      IF exp > datetime.now(timezone.utc):
         RETURN (True, "plus_active")
       ELSE:
         # Auto-downgrade expired plan
