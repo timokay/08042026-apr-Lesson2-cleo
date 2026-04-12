@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -11,7 +11,7 @@ type PlanStatus = {
   is_active: boolean
 }
 
-export default function UpgradePage() {
+function UpgradeContent() {
   const searchParams = useSearchParams()
   const success = searchParams.get('success') === '1'
   const failed = searchParams.get('failed') === '1'
@@ -139,6 +139,14 @@ export default function UpgradePage() {
         Оплата через Robokassa · Безопасно · ФЗ-152
       </p>
     </main>
+  )
+}
+
+export default function UpgradePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <UpgradeContent />
+    </Suspense>
   )
 }
 

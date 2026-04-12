@@ -72,13 +72,14 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   // Update transaction to 'paid' with race condition guard (.eq status='pending')
+  // count: 'exact' required — without it Supabase returns count: null (not 0)
   const { count } = await supabase
     .from('payment_transactions')
     .update({
       status: 'paid',
       paid_at: new Date().toISOString(),
       raw_robokassa_response: outSum,
-    })
+    }, { count: 'exact' })
     .eq('invoice_id', invoiceId)
     .eq('status', 'pending')  // Race condition guard: only update if still pending
 

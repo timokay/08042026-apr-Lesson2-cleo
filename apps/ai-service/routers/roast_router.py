@@ -4,13 +4,13 @@ Source: docs/Pseudocode.md Algorithm 4, docs/Specification.md POST /api/roast
 """
 import json
 import os
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from models.schemas import RoastRequest
-from services.rate_limiter import get_rate_limiter
+from services.rate_limiter import RateLimiter, get_rate_limiter
 from services.roast_generator import generate_roast
 
 router = APIRouter(prefix="/roast", tags=["roast"])
@@ -18,15 +18,25 @@ router = APIRouter(prefix="/roast", tags=["roast"])
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
 
-async def _sse_stream(req: RoastRequest) -> AsyncGenerator[bytes, None]:
+async def _sse_stream(
+    req: RoastRequest,
+    limiter: Optional[RateLimiter] = None,
+) -> AsyncGenerator[bytes, None]:
     """
     SSE format: each chunk must end with \n\n
     Tokens streamed as: data: {"text": "..."}\n\n
     Final event:        event: done\ndata: {"summary": "..."}\n\n
+    Monthly quota consumed after first token — not before — so failures don't waste quota.
     """
     full_text = []
+    quota_consumed = False
 
     async for chunk in generate_roast(req):
+        # Consume monthly quota on first successful token (free plan)
+        if not quota_consumed and limiter and req.plan == "free":
+            await limiter.consume_monthly_roast(req.user_id)
+            quota_consumed = True
+
         full_text.append(chunk)
         payload = json.dumps({"text": chunk}, ensure_ascii=False)
         yield f"event: token\ndata: {payload}\n\n".encode("utf-8")
@@ -70,7 +80,7 @@ async def roast(req: RoastRequest) -> StreamingResponse:
         )
 
     return StreamingResponse(
-        _sse_stream(req),
+        _sse_stream(req, limiter=limiter),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

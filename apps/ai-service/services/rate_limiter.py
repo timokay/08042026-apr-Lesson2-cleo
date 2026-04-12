@@ -64,11 +64,8 @@ class RateLimiter:
 
         return RateLimitResult(allowed=True, retry_after=0, remaining=limit - count)
 
-    async def check_monthly_roast(self, user_id: str) -> RateLimitResult:
-        """
-        Free plan: 1 roast per calendar month.
-        Key resets at start of next month (TTL = days remaining in month * 86400).
-        """
+    def _monthly_roast_key(self, user_id: str) -> tuple[str, int]:
+        """Returns (redis_key, ttl_seconds) for this user's current month."""
         import calendar
         from datetime import datetime
 
@@ -76,23 +73,30 @@ class RateLimiter:
         days_in_month = calendar.monthrange(now.year, now.month)[1]
         days_remaining = days_in_month - now.day + 1
         ttl = days_remaining * 86400
-
         key = f"roast:monthly:{user_id}:{now.year}:{now.month}"
+        return key, ttl
 
+    async def check_monthly_roast(self, user_id: str) -> RateLimitResult:
+        """
+        Free plan: check if user has roast quota remaining this month.
+        Does NOT consume the quota — call consume_monthly_roast() after success.
+        """
+        key, ttl = self._monthly_roast_key(user_id)
         count = await self._redis.get(key)
         if count and int(count) >= 1:
-            return RateLimitResult(
-                allowed=False,
-                retry_after=ttl,
-                remaining=0,
-            )
+            return RateLimitResult(allowed=False, retry_after=ttl, remaining=0)
+        return RateLimitResult(allowed=True, retry_after=0, remaining=0)
 
+    async def consume_monthly_roast(self, user_id: str) -> None:
+        """
+        Consume the monthly roast quota for free plan.
+        Call only after the roast stream has started successfully.
+        """
+        key, ttl = self._monthly_roast_key(user_id)
         pipe = self._redis.pipeline()
         pipe.incr(key)
         pipe.expire(key, ttl)
         await pipe.execute()
-
-        return RateLimitResult(allowed=True, retry_after=0, remaining=0)
 
 
 # Singleton pattern — shared across requests to avoid connection pool exhaustion
