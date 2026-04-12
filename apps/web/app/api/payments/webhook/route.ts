@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '../../../../lib/supabase/service'
 import { verifyWebhookSignature, PLUS_DURATION_DAYS } from '../../../../lib/robokassa'
+import { sendAlert } from '../../../../lib/telegram'
 
 /**
  * POST /api/payments/webhook (Robokassa ResultURL)
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   if (upgradeError) {
     console.error('Failed to upgrade user plan:', upgradeError, { userId, invoiceId })
     // Don't return error — Robokassa would retry. Transaction is paid, log for manual fix.
-    // TODO: add alerting here
+    sendAlert(`⚠️ Plan upgrade failed\nUser: ${userId}\nInvoice: ${invoiceId}\nError: ${upgradeError.message}`)
   }
 
   console.info('User %s upgraded to Plus, expires %s', userId, expiresAt.toISOString())
