@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from models.schemas import HealthResponse
 from routers.analyze_router import router as analyze_router
+from routers.chat_router import router as chat_router
 from routers.roast_router import router as roast_router
 
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +47,7 @@ app.add_middleware(
 # Routers
 app.include_router(analyze_router)
 app.include_router(roast_router)
+app.include_router(chat_router)
 
 
 @app.get("/health", response_model=HealthResponse)

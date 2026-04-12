@@ -64,6 +64,53 @@ class RateLimiter:
 
         return RateLimitResult(allowed=True, retry_after=0, remaining=limit - count)
 
+    async def check_daily_chat(self, user_id: str, plan: str) -> RateLimitResult:
+        """
+        Daily chat message limit: free=10, plus=100.
+        Uses atomic Lua script to prevent TOCTOU race condition.
+        Key resets at midnight UTC (TTL = seconds until midnight).
+        """
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        today = now.strftime('%Y-%m-%d')
+        limit = 10 if plan == 'free' else 100
+
+        midnight = datetime(now.year, now.month, now.day, tzinfo=timezone.utc) + timedelta(days=1)
+        ttl = int((midnight - now).total_seconds())
+
+        key = f"chat:daily:{user_id}:{today}"
+
+        # Atomic Lua: check limit, increment if allowed, set TTL on first write
+        lua_script = """
+local count = tonumber(redis.call('GET', KEYS[1])) or 0
+if count >= tonumber(ARGV[1]) then
+    return -1
+end
+local new_count = redis.call('INCR', KEYS[1])
+if new_count == 1 then
+    redis.call('EXPIRE', KEYS[1], ARGV[2])
+end
+return new_count
+"""
+        result = await self._redis.eval(lua_script, 1, key, limit, ttl)
+
+        if result == -1:
+            return RateLimitResult(allowed=False, retry_after=ttl, remaining=0)
+
+        return RateLimitResult(allowed=True, retry_after=0, remaining=limit - int(result))
+
+    async def decrement_daily_chat(self, user_id: str) -> None:
+        """Undo a daily chat increment (e.g. when request fails before AI call)."""
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        today = now.strftime('%Y-%m-%d')
+        key = f"chat:daily:{user_id}:{today}"
+        count = await self._redis.get(key)
+        if count and int(count) > 0:
+            await self._redis.decr(key)
+
     def _monthly_roast_key(self, user_id: str) -> tuple[str, int]:
         """Returns (redis_key, ttl_seconds) for this user's current month."""
         import calendar
@@ -75,6 +122,54 @@ class RateLimiter:
         ttl = days_remaining * 86400
         key = f"roast:monthly:{user_id}:{now.year}:{now.month}"
         return key, ttl
+
+    async def check_chat_rate(self, user_id: str) -> RateLimitResult:
+        """
+        Sliding window: 10 chat requests per 60 seconds.
+        Separate from check_ai_rate so chat and roast limits can diverge independently.
+        """
+        return await self._check_sliding_window(
+            key=f"rate:chat:{user_id}",
+            block_key=f"rate:block:{user_id}",
+            limit=10,
+            abuse_limit=15,
+            window=60,
+            abuse_block=3600,
+        )
+
+    async def _check_sliding_window(
+        self,
+        key: str,
+        block_key: str,
+        limit: int,
+        abuse_limit: int,
+        window: int,
+        abuse_block: int,
+    ) -> RateLimitResult:
+        """Reusable sliding window rate limiter."""
+        now = time.time()
+
+        blocked_ttl = await self._redis.ttl(block_key)
+        if blocked_ttl > 0:
+            return RateLimitResult(allowed=False, retry_after=blocked_ttl, remaining=0)
+
+        pipe = self._redis.pipeline()
+        pipe.zremrangebyscore(key, 0, now - window)
+        pipe.zcard(key)
+        pipe.zadd(key, {str(now): now})
+        pipe.expire(key, window * 2)
+        results = await pipe.execute()
+
+        count = results[1] + 1
+
+        if count > abuse_limit:
+            await self._redis.setex(block_key, abuse_block, "1")
+            return RateLimitResult(allowed=False, retry_after=abuse_block, remaining=0)
+
+        if count > limit:
+            return RateLimitResult(allowed=False, retry_after=window, remaining=0)
+
+        return RateLimitResult(allowed=True, retry_after=0, remaining=limit - count)
 
     async def check_monthly_roast(self, user_id: str) -> RateLimitResult:
         """

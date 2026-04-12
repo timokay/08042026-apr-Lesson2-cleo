@@ -90,6 +90,20 @@ class RoastRequest(BaseModel):
     plan: Literal["free", "plus"] = "free"  # passed by BFF; determines monthly limit enforcement
 
 
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatRequest(BaseModel):
+    user_id: str
+    session_id: str
+    message: str
+    history: list[ChatMessage] = []
+    context: dict = {}  # { total_spent, top_categories, parasites, period }
+    plan: Literal["free", "plus"] = "free"
+
+
 class ParasitesRequest(BaseModel):
     transactions: list[Transaction]
 
