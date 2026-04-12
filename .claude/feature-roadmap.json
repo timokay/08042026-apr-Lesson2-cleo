@@ -96,7 +96,7 @@
       "id": "ai-chat",
       "name": "AI Chat (v1 feature)",
       "description": "Conversational AI financial advisor, streaming chat interface, context-aware responses",
-      "status": "planned",
+      "status": "done",
       "files": [
         "apps/ai-service/routers/chat_router.py",
         "apps/web/app/chat/page.tsx"
