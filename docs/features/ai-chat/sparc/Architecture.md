@@ -62,9 +62,13 @@ sequenceDiagram
 ## Redis Key Schema
 
 ```
-chat:daily:{user_id}:{YYYY-MM-DD}   TTL = до конца дня UTC
-chat:history:{session_id}            TTL = 3600s (1 час)
+chat:daily:{user_id}:{YYYY-MM-DD}     TTL = seconds_until_midnight_UTC()
+chat:history:{user_id}:{session_id}   TTL = 3600s (1 час)
+chat:context:{user_id}:{YYYY-MM-DD}   TTL = 3600s — кеш /analyze результата
 ```
+
+Note: `chat:history` ключ включает `user_id` для изоляции сессий.
+`REDIS_URL` должен быть одинаковым для BFF (Next.js) и AI Service — единый Redis instance.
 
 ## Consistency with Project Architecture
 
@@ -73,7 +77,29 @@ chat:history:{session_id}            TTL = 3600s (1 час)
 - RLS: chat_messages защищены по user_id ✅
 - Secrets: CLAUDE_API_KEY только в AI Service ✅
 - Streaming: SSE через `text/event-stream` ✅
-- Rate limiting: Redis sliding window (существующий паттерн) ✅
+- Rate limiting: Redis sliding window — **отдельный метод `check_chat_rate(limit=10)`** ✅
+  (не переиспользует `check_ai_rate` напрямую — у чата иные лимиты, чем у roast)
+
+## Context Caching: /analyze результат
+
+Каждый чат-запрос НЕ вызывает `/analyze` повторно. BFF кеширует результат:
+
+```
+cache_key = "chat:context:{user_id}:{YYYY-MM-DD}"  TTL = 3600s
+
+GET cache_key → если есть, использовать
+Если нет:
+  context = POST /analyze
+  SET cache_key context EX 3600
+```
+
+Это предотвращает N × `/analyze` вызовов за одну chat-сессию (N = количество сообщений).
+
+## ADR: Отдельный rate limit для чата
+
+**Решение:** `check_chat_rate(user_id, limit=10)` — новый метод в RateLimiter, не изменяет `check_ai_rate`.
+
+**Причина:** `check_ai_rate` используется для roast-mode с лимитом 10 req/min. Чат также 10 req/min, но в будущем лимиты могут расходиться. Параметризованный метод даёт гибкость без копирования кода.
 
 ## ADR: История сессии в Redis (не DB)
 
