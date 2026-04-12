@@ -82,7 +82,7 @@
       "id": "upgrade-plus",
       "name": "Upgrade to Plus",
       "description": "Robokassa payment integration, Plus plan (299₽/мес), plan enforcement (free: 1 roast/month)",
-      "status": "next",
+      "status": "done",
       "files": [
         "apps/web/app/api/payment/route.ts",
         "apps/web/app/upgrade/page.tsx",
